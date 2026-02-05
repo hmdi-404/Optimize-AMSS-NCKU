@@ -13,6 +13,9 @@
 
 #define TINY 1.0e-20
 
+// add by Hamdi 4/2/26
+#define node_root 0
+
 class TwoPunctures
 {
 public:
@@ -47,6 +50,8 @@ private:
               int nvar, n1, n2, n3;
               double b;
        };
+
+       int node, node_size;
 
 public:
        TwoPunctures(double mp, double mm, double b, double P_plusx, double P_plusy, double P_plusz,
@@ -134,6 +139,7 @@ public:
                          double const *rhs, int const *ncols,
                          int **cols, double **JFD);
        void ThomasAlgorithm(int N, double *b, double *a, double *c, double *x, double *q);
+
        void Save(char *fname);
        // provided by Vasileios Paschalidis (vpaschal@illinois.edu)
        double Spec_IntPolABphiFast(parameters par, double *v, int ivar, double A, double B, double phi);
