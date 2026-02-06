@@ -14,4 +14,4 @@ mpirun -np 1 --map-by ppr:1:socket:PE="<number of threads in your computer>" ./T
 ./TwoPunctureABE
 ```
 
-## **`Warning: My code not perfect but faster than default version`**
+#### **`$\color{red}{\text{Warning:}}$`** My code not perfect but faster than default version
