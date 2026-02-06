@@ -9,7 +9,7 @@ mpic++ -O3 -ffast-math -march=native TwoPunctureABE.cpp TwoPunctures.cpp -o TwoP
 ```bash
 mpirun -np 1 --map-by ppr:1:socket:PE="<number of threads in your computer>" ./TwoPunctureABE
 ```
-# or 
+or 
 ```bash
 ./TwoPunctureABE
 ```
