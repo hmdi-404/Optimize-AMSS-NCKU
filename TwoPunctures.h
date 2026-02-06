@@ -140,6 +140,9 @@ public:
                          int **cols, double **JFD);
        void ThomasAlgorithm(int N, double *b, double *a, double *c, double *x, double *q);
 
+       // ThomasAlgorithm_P add by hamdi Awae 4/2/26
+       void ThomasAlgorithm_P(int mynode, int numnodes, int N, double *b, double *a, double *c, double *x, double *q);
+
        void Save(char *fname);
        // provided by Vasileios Paschalidis (vpaschal@illinois.edu)
        double Spec_IntPolABphiFast(parameters par, double *v, int ivar, double A, double B, double phi);

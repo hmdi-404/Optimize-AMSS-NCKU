@@ -1,6 +1,8 @@
 #include <assert.h>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -166,6 +168,7 @@ void TwoPunctures::Solve()
 	target_M_plus = Mp_adm;
 	target_M_minus = Mm_adm;
 }
+
 void TwoPunctures::Save(char *fname)
 {
 	ofstream outfile;
@@ -1205,6 +1208,12 @@ void TwoPunctures::Derivatives_AB3(int nvar, int n1, int n2, int n3, derivs v)
 			}
 		}
 	}
+
+    // add by Hamdi 6/2/26
+    #pragma omp parallel
+    {
+        
+    }
 	free_dvector(p, 0, N);
 	free_dvector(dp, 0, N);
 	free_dvector(d2p, 0, N);
@@ -1335,10 +1344,12 @@ void TwoPunctures::F_of_v(int nvar, int n1, int n2, int n3, derivs v, double *F,
 		free(s_x);
 	}
 	else
+    {
 		for (i = 0; i < n1; i++)
 			for (j = 0; j < n2; j++)
 				for (k = 0; k < n3; k++)
 					sources[Index(0, i, j, k, 1, n1, n2, n3)] = 0.0;
+    }
 
 	Derivatives_AB3(nvar, n1, n2, n3, v);
 	double psi, psi2, psi4, psi7, r_plus, r_minus;
@@ -1348,6 +1359,7 @@ void TwoPunctures::F_of_v(int nvar, int n1, int n2, int n3, derivs v, double *F,
 		debugfile = fopen("res.dat", "w");
 		assert(debugfile);
 	}
+
 	for (i = 0; i < n1; i++)
 	{
 		for (j = 0; j < n2; j++)
@@ -1435,6 +1447,7 @@ void TwoPunctures::F_of_v(int nvar, int n1, int n2, int n3, derivs v, double *F,
 			}
 		}
 	}
+
 	if (debugfile)
 	{
 		fclose(debugfile);
@@ -1447,14 +1460,14 @@ void TwoPunctures::F_of_v(int nvar, int n1, int n2, int n3, derivs v, double *F,
 double TwoPunctures::norm_inf(double const *F, int const ntotal)
 {
 	double dmax = -1;
-	{
-		double dmax1 = -1;
-		for (int j = 0; j < ntotal; j++)
-			if (fabs(F[j]) > dmax1)
-				dmax1 = fabs(F[j]);
-		if (dmax1 > dmax)
-			dmax = dmax1;
-	}
+    double dmax1 = -1;
+    for (int j = 0; j < ntotal; j++)
+        if (fabs(F[j]) > dmax1)
+            dmax1 = fabs(F[j]);
+
+    if (dmax1 > dmax)
+        // dmax = dmax1;
+        return dmax1;
 	return dmax;
 }
 /* --------------------------------------------------------------------------*/
@@ -1841,32 +1854,31 @@ void TwoPunctures::J_times_dv(int nvar, int n1, int n2, int n3, derivs dv, doubl
 	/*      and the function u (u.d0[]) as well as its derivatives*/
 	/*      (u.d1[], u.d2[], u.d3[], u.d11[], u.d12[], u.d13[], u.d22[], u.d23[], u.d33[])*/
 	/*      at interior points and at the boundaries "+/-"*/
-	int i, j, k, ivar, indx;
-	double al, be, A, B, X, R, x, r, phi, y, z, Am1, *values;
+
 	derivs dU, U;
 
 	Derivatives_AB3(nvar, n1, n2, n3, dv);
 
-	for (i = 0; i < n1; i++)
+    double *values = dvector(0, nvar - 1);
+    allocate_derivs(&dU, nvar);
+    allocate_derivs(&U, nvar);
+
+	for (int i = 0; i < n1; i++)
 	{
-		values = dvector(0, nvar - 1);
-		allocate_derivs(&dU, nvar);
-		allocate_derivs(&U, nvar);
-		for (j = 0; j < n2; j++)
+		for (int j = 0; j < n2; j++)
 		{
-			for (k = 0; k < n3; k++)
+			for (int k = 0; k < n3; k++)
 			{
+				double al = Pih * (2 * i + 1) / n1;
+				double A = -cos(al);
+				double be = Pih * (2 * j + 1) / n2;
+				double B = -cos(be);
+				double phi = 2. * Pi * k / n3;
 
-				al = Pih * (2 * i + 1) / n1;
-				A = -cos(al);
-				be = Pih * (2 * j + 1) / n2;
-				B = -cos(be);
-				phi = 2. * Pi * k / n3;
-
-				Am1 = A - 1;
-				for (ivar = 0; ivar < nvar; ivar++)
+				double Am1 = A - 1;
+				for (int ivar = 0; ivar < nvar; ivar++)
 				{
-					indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
+					int indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
 					dU.d0[ivar] = Am1 * dv.d0[indx];                     /* dU*/
 					dU.d1[ivar] = dv.d0[indx] + Am1 * dv.d1[indx];       /* dU_A*/
 					dU.d2[ivar] = Am1 * dv.d2[indx];                     /* dU_B*/
@@ -1888,6 +1900,8 @@ void TwoPunctures::J_times_dv(int nvar, int n1, int n2, int n3, derivs dv, doubl
 					U.d23[ivar] = u.d23[indx];                           /* U_yz*/
 					U.d33[ivar] = u.d33[indx];                           /* U_zz*/
 				}
+
+                double X, R, x, r, y, z;
 				/* Calculation of (X,R) and*/
 				/* (dU_X, dU_R, dU_3, dU_XX, dU_XR, dU_X3, dU_RR, dU_R3, dU_33)*/
 				AB_To_XR(nvar, A, B, &X, &R, dU);
@@ -1898,17 +1912,17 @@ void TwoPunctures::J_times_dv(int nvar, int n1, int n2, int n3, derivs dv, doubl
 				/* (dU, dU_x, dU_y, dU_z, dU_xx, dU_xy, dU_xz, dU_yy, dU_yz, dU_zz)*/
 				rx3_To_xyz(nvar, x, r, phi, &y, &z, dU);
 				LinEquations(A, B, X, R, x, r, phi, y, z, dU, U, values);
-				for (ivar = 0; ivar < nvar; ivar++)
+				for (int ivar = 0; ivar < nvar; ivar++)
 				{
-					indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
+					int indx = Index(ivar, i, j, k, nvar, n1, n2, n3);
 					Jdv[indx] = values[ivar] * FAC;
 				}
 			}
 		}
-		free_dvector(values, 0, nvar - 1);
-		free_derivs(&dU, nvar);
-		free_derivs(&U, nvar);
 	}
+    free_dvector(values, 0, nvar - 1);
+    free_derivs(&dU, nvar);
+    free_derivs(&U, nvar);
 }
 /* --------------------------------------------------------------------------*/
 void TwoPunctures::relax(double *dv, int const nvar, int const n1, int const n2, int const n3,
@@ -1945,17 +1959,17 @@ void TwoPunctures::relax(double *dv, int const nvar, int const n1, int const n2,
 	// 	}
 	// }
 
+    // add by Hamdi 5/2/26
     #pragma omp parallel
     {
         #pragma omp for collapse(2)
         for (int k=0;k < n3;k++) {
-            for (int n;n < N_PlaneRelax;n++) {
+            for (int n = 0;n < N_PlaneRelax;n++) {
 
                 if (k%2 == 0){
                     for (int i=1;i < n1;i++) {
                         LineRelax_be(dv, i, k, nvar, n1, n2, n3, rhs, ncols, cols, JFD); 
                     }
-
                     for (int j=0;j < n2;j++) {
                         LineRelax_al(dv, j, k, nvar, n1, n2, n3, rhs, ncols, cols, JFD);
                     }
@@ -1963,7 +1977,6 @@ void TwoPunctures::relax(double *dv, int const nvar, int const n1, int const n2,
                     for (int i=0;i < n1;i++) {
                         LineRelax_be(dv, i, k, nvar, n1, n2, n3, rhs, ncols, cols, JFD); 
                     }
-
                     for (int j=0;j < n2;j++) {
                         LineRelax_al(dv, j, k, nvar, n1, n2, n3, rhs, ncols, cols, JFD);
                     }
@@ -1993,7 +2006,6 @@ void TwoPunctures::LineRelax_be(double *dv,
 	//  gsl_vector *b = gsl_vector_alloc(n2);   /* rhs */
 	//  gsl_vector *x = gsl_vector_alloc(n2);   /* solution vector */
 
-	// for loop เยอะเกินไป ไปแก้ส่ะะะะะะ
 	for (ivar = 0; ivar < nvar; ivar++)
 	{
 		for (j = 0; j < n2 - 1; j++)
